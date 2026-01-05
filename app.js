@@ -113,14 +113,13 @@ function setupEventListeners() {
     if (state.unsavedCallback) state.unsavedCallback();
   });
 
-  // Canvas Events
+  // Canvas Events - use document for move/up to allow dragging outside canvas
   canvas.addEventListener('mousedown', handleCanvasDown);
-  canvas.addEventListener('mousemove', handleCanvasMove);
-  canvas.addEventListener('mouseup', handleCanvasUp);
-  canvas.addEventListener('mouseleave', handleCanvasUp);
+  document.addEventListener('mousemove', handleCanvasMove);
+  document.addEventListener('mouseup', handleCanvasUp);
   canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-  canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-  canvas.addEventListener('touchend', handleCanvasUp);
+  document.addEventListener('touchmove', handleTouchMove, { passive: false });
+  document.addEventListener('touchend', handleCanvasUp);
 
   // Click outside to close
   document.addEventListener('click', (e) => {
@@ -588,6 +587,14 @@ function getCanvasPos(e) {
   return { x, y };
 }
 
+function getCanvasPosClamped(e) {
+  const pos = getCanvasPos(e);
+  return {
+    x: Math.max(0, Math.min(state.canvas.width - 1, pos.x)),
+    y: Math.max(0, Math.min(state.canvas.height - 1, pos.y))
+  };
+}
+
 function handleTouchStart(e) {
   e.preventDefault();
   handleCanvasDown(e);
@@ -600,6 +607,7 @@ function handleTouchMove(e) {
 
 function handleCanvasDown(e) {
   const pos = getCanvasPos(e);
+  const posClamped = getCanvasPosClamped(e);
   state.isDrawing = true;
   state.lastPixel = pos;
 
@@ -611,10 +619,12 @@ function handleCanvasDown(e) {
   if (state.tool === 'pen') {
     drawPixel(pos.x, pos.y);
   } else if (state.tool === 'fill') {
-    floodFill(pos.x, pos.y);
+    floodFill(posClamped.x, posClamped.y);
+  } else if (state.tool === 'eyedropper') {
+    pickColor(posClamped.x, posClamped.y);
   } else if (state.tool === 'select') {
     clearSelection();
-    state.selectionStart = pos;
+    state.selectionStart = posClamped;
   }
 }
 
@@ -622,6 +632,7 @@ function handleCanvasMove(e) {
   if (!state.isDrawing) return;
 
   const pos = getCanvasPos(e);
+  const posClamped = getCanvasPosClamped(e);
 
   if (state.selectionMode === 'move' || state.selectionMode === 'clone') {
     const dx = pos.x - state.moveStart.x;
@@ -656,12 +667,15 @@ function handleCanvasMove(e) {
     }
 
     state.lastPixel = pos;
+  } else if (state.tool === 'eyedropper') {
+    pickColor(posClamped.x, posClamped.y);
   } else if (state.tool === 'select' && state.selectionStart) {
+    // Use clamped positions so selection stays within canvas bounds
     state.selection = {
-      x: Math.min(state.selectionStart.x, pos.x),
-      y: Math.min(state.selectionStart.y, pos.y),
-      width: Math.abs(pos.x - state.selectionStart.x) + 1,
-      height: Math.abs(pos.y - state.selectionStart.y) + 1
+      x: Math.min(state.selectionStart.x, posClamped.x),
+      y: Math.min(state.selectionStart.y, posClamped.y),
+      width: Math.abs(posClamped.x - state.selectionStart.x) + 1,
+      height: Math.abs(posClamped.y - state.selectionStart.y) + 1
     };
     drawSelection();
   }
@@ -766,6 +780,29 @@ function floodFill(startX, startY) {
   layer.ctx.putImageData(imageData, 0, 0);
   render();
   state.hasUnsavedChanges = true;
+}
+
+// Eyedropper
+function pickColor(x, y) {
+  // Get color from the merged/rendered canvas
+  const imageData = ctx.getImageData(x, y, 1, 1).data;
+  const r = imageData[0];
+  const g = imageData[1];
+  const b = imageData[2];
+  const a = imageData[3];
+
+  // If transparent, don't pick
+  if (a === 0) return;
+
+  const hex = '#' + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('');
+
+  // Set the active swatch color (1 or 2, not eraser)
+  const targetSwatch = state.activeSwatch === 'eraser' ? '1' : state.activeSwatch;
+  state.colors[targetSwatch] = hex;
+  updateSwatchColors();
+
+  // Select that swatch
+  selectSwatch(targetSwatch);
 }
 
 // Selection
