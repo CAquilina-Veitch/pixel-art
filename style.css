@@ -507,6 +507,28 @@ html, body {
   opacity: 0.5;
 }
 
+.layer-select-dot {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+  touch-action: manipulation;
+}
+
+.layer-item.selected .layer-select-dot {
+  opacity: 1;
+  color: var(--selected);
+}
+
 .layer-visibility {
   width: 20px;
   height: 20px;
@@ -552,15 +574,28 @@ html, body {
   background: var(--border);
   border-radius: 2px;
   cursor: pointer;
+  touch-action: none;
+  padding: 8px 0;
+  margin: -8px 0;
+  box-sizing: content-box;
 }
 
 .layer-opacity input::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 10px;
-  height: 10px;
+  width: 16px;
+  height: 16px;
   background: var(--text);
   border-radius: 50%;
   cursor: pointer;
+}
+
+.layer-opacity input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--text);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
 }
 
 /* Dropdown Menu */
