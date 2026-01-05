@@ -32,6 +32,39 @@ const selectionOverlay = $('selection-overlay');
 const selCtx = selectionOverlay.getContext('2d');
 const canvasContainer = $('canvas-container');
 
+// Touch slider helper for better mobile drag behavior
+function setupTouchSlider(slider, onChange) {
+  let isDragging = false;
+  const min = parseInt(slider.min);
+  const max = parseInt(slider.max);
+
+  function calculateValue(clientX) {
+    const rect = slider.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return Math.round(min + ratio * (max - min));
+  }
+
+  slider.addEventListener('touchstart', (e) => {
+    isDragging = true;
+    e.preventDefault(); // Prevent scroll and tap-to-position
+    const touch = e.touches[0];
+    const value = calculateValue(touch.clientX);
+    onChange(value);
+  }, { passive: false });
+
+  slider.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const value = calculateValue(touch.clientX);
+    onChange(value);
+  }, { passive: false });
+
+  slider.addEventListener('touchend', () => {
+    isDragging = false;
+  });
+}
+
 // Initialize
 function init() {
   setupEventListeners();
@@ -256,6 +289,9 @@ function updateLayersPanel() {
     item.dataset.id = layer.id;
 
     item.innerHTML = `
+      <button class="layer-select-dot" data-id="${layer.id}" title="Select layer">
+        ${layer.id === state.currentLayerId ? '●' : '○'}
+      </button>
       <button class="layer-visibility ${!layer.visible ? 'hidden-layer' : ''}" data-id="${layer.id}">
         ${layer.visible ? '👁' : '○'}
       </button>
@@ -271,6 +307,11 @@ function updateLayersPanel() {
       }
     });
 
+    item.querySelector('.layer-select-dot').addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectLayer(layer.id);
+    });
+
     item.querySelector('.layer-visibility').addEventListener('click', (e) => {
       e.stopPropagation();
       toggleLayerVisibility(layer.id);
@@ -281,8 +322,18 @@ function updateLayersPanel() {
       state.hasUnsavedChanges = true;
     });
 
-    item.querySelector('.layer-opacity input').addEventListener('input', (e) => {
+    const opacitySlider = item.querySelector('.layer-opacity input');
+
+    opacitySlider.addEventListener('input', (e) => {
       layer.opacity = parseInt(e.target.value);
+      render();
+      state.hasUnsavedChanges = true;
+    });
+
+    // Better touch handling for mobile - makes slider more "draggy"
+    setupTouchSlider(opacitySlider, (value) => {
+      layer.opacity = value;
+      opacitySlider.value = value;
       render();
       state.hasUnsavedChanges = true;
     });
